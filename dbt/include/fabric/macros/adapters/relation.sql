@@ -78,7 +78,7 @@
   {% endif %}
   {% if to_relation.type == 'table' %}
       {% call statement('rename_relation') %}
-        EXEC('create table {{ to_relation.include(database=False) }} as select * from {{ from_relation.include(database=False) }}');
+        EXEC('SELECT * INTO {{ to_relation.include(database=False) }} FROM {{ from_relation.include(database=False) }}');
       {%- endcall %}
       -- Getting constraints from the old table
       {% call statement('get_table_constraints', fetch_result=True) %}
@@ -160,9 +160,9 @@
   {% endset %}
 
   {% call statement('truncate_relation') -%}
-    CREATE TABLE {{ tempTableName }} AS SELECT * FROM {{ relation }} WHERE 1=2
+    SELECT * INTO {{ tempTableName }} FROM {{ relation }} WHERE 1=2
     EXEC('DROP TABLE IF EXISTS {{ relation.include(database=False) }};');
-    EXEC('CREATE TABLE {{ relation.include(database=False) }} AS SELECT * FROM {{ tempTableName }};');
+    EXEC('SELECT * INTO {{ relation.include(database=False) }} FROM {{ tempTableName }};');
     EXEC('DROP TABLE IF EXISTS {{ tempTableName }};');
   {%- endcall %}
 

@@ -25,7 +25,7 @@
         ({{listColumns}}) SELECT {{listColumns}} FROM {{ tmp_relation.include(database=False) }};
 
     {%- else %}
-      EXEC('CREATE TABLE {{ relation.include(database=False) }} AS (SELECT * FROM {{ tmp_relation.include(database=False) }});');
+      EXEC('SELECT * INTO {{ relation.include(database=False) }} FROM {{ tmp_relation.include(database=False) }});');
     {% endif %}
 
     {{ fabric__drop_relation_script(tmp_relation) }}
