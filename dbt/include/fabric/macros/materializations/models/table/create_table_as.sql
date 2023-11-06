@@ -1,3 +1,4 @@
+
 {% macro fabric__create_table_as(temporary, relation, sql) -%}
 
    {% set tmp_relation = relation.incorporate(
@@ -25,7 +26,7 @@
         ({{listColumns}}) SELECT {{listColumns}} FROM {{ tmp_relation.include(database=False) }};
 
     {%- else %}
-      EXEC('SELECT * INTO {{ relation.include(database=False) }} FROM {{ tmp_relation.include(database=False) }});');
+      EXEC('SELECT * INTO {{ relation.include(database=False) }} FROM {{ tmp_relation.include(database=False) }};');
     {% endif %}
 
     {{ fabric__drop_relation_script(tmp_relation) }}
