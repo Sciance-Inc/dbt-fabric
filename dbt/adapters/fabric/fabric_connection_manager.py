@@ -416,9 +416,15 @@ class FabricConnectionManager(SQLConnectionManager):
 
         con_str_concat = ";".join(con_str)
 
-        con_str_display = con_str_concat
-        logger.debug(f"Using connection string: {con_str_display}")
-        print(f"Using connection string: {con_str_display}")
+        index = []
+        for i, elem in enumerate(con_str):
+            if "pwd=" in elem.lower():
+                index.append(i)
+
+        if len(index) != 0:
+            con_str[index[0]] = "PWD=***"
+
+        con_str_display = ";".join(con_str)
 
         retryable_exceptions = [  # https://github.com/mkleehammer/pyodbc/wiki/Exceptions
             pyodbc.InternalError,  # not used according to docs, but defined in PEP-249
