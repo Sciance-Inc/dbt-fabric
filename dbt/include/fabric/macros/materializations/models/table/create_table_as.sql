@@ -1,10 +1,13 @@
 {% macro fabric__create_table_as(temporary, relation, sql) -%}
     {% set query_label = apply_label() %}
-    {% set tmp_vw_relation = relation.incorporate(path={"identifier": relation.identifier ~ '__dbt_tmp_vw'}, type='view')-%}
+    {% set tmp_vw_relation = relation.incorporate(
+        path={"identifier": relation.identifier ~ "__dbt_tmp_vw"},
+        type="view",
+    ) -%}
     {% do adapter.drop_relation(tmp_vw_relation) %}
     {{ get_create_view_as_sql(tmp_vw_relation, sql) }}
 
-    {% set contract_config = config.get('contract') %}
+    {% set contract_config = config.get("contract") %}
     {% if contract_config.enforced %}
 
         CREATE TABLE {{relation}}
@@ -21,6 +24,7 @@
 
     {%- else %}
         {%- set query_label_option = query_label.replace("'", "''") -%}
-        EXEC('CREATE TABLE {{relation}} AS SELECT * FROM {{tmp_vw_relation}} {{ query_label_option }}');
+        exec('SELECT * INTO {{ relation}} FROM {{ tmp_vw_relation }};')
+        ;
     {% endif %}
 {% endmacro %}
