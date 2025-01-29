@@ -9,18 +9,25 @@ import agate
 import dbt_common.exceptions
 import pyodbc
 from azure.core.credentials import AccessToken
-from azure.identity import AzureCliCredential, DefaultAzureCredential, EnvironmentCredential
-from dbt.adapters.contracts.connection import AdapterResponse, Connection, ConnectionState
+from azure.identity import (
+    AzureCliCredential,
+    DefaultAzureCredential,
+    EnvironmentCredential,
+)
+from dbt.adapters.contracts.connection import (
+    AdapterResponse,
+    Connection,
+    ConnectionState,
+)
 from dbt.adapters.events.logging import AdapterLogger
 from dbt.adapters.events.types import ConnectionUsed, SQLQuery, SQLQueryStatus
+from dbt.adapters.fabric import __version__
+from dbt.adapters.fabric.fabric_credentials import FabricCredentials
 from dbt.adapters.sql import SQLConnectionManager
 from dbt_common.clients.agate_helper import empty_table
 from dbt_common.events.contextvars import get_node_info
 from dbt_common.events.functions import fire_event
 from dbt_common.utils.casting import cast_to_str
-
-from dbt.adapters.fabric import __version__
-from dbt.adapters.fabric.fabric_credentials import FabricCredentials
 
 AZURE_CREDENTIAL_SCOPE = "https://database.windows.net//.default"
 SYNAPSE_SPARK_CREDENTIAL_SCOPE = "DW"
@@ -205,7 +212,9 @@ def get_pyodbc_attrs_before_credentials(credentials: FabricCredentials) -> Dict:
 
     authentication = str(credentials.authentication).lower()
     if authentication in AZURE_AUTH_FUNCTIONS:
-        time_remaining = (_TOKEN.expires_on - time.time()) if _TOKEN else MAX_REMAINING_TIME
+        time_remaining = (
+            (_TOKEN.expires_on - time.time()) if _TOKEN else MAX_REMAINING_TIME
+        )
 
         if _TOKEN is None or (time_remaining < MAX_REMAINING_TIME):
             azure_auth_function = AZURE_AUTH_FUNCTIONS[authentication]
@@ -380,7 +389,8 @@ class FabricConnectionManager(SQLConnectionManager):
         elif credentials.windows_login:
             con_str.append("trusted_connection=Yes")
         elif credentials.authentication == "sql":
-            raise pyodbc.DatabaseError("SQL Authentication is not supported by Microsoft Fabric")
+            con_str.append(f"UID={{{credentials.UID}}}")
+            con_str.append(f"PWD={{{credentials.PWD}}}")
 
         # https://docs.microsoft.com/en-us/sql/relational-databases/native-client/features/using-encryption-without-validation?view=sql-server-ver15
         assert credentials.encrypt is not None
@@ -388,7 +398,9 @@ class FabricConnectionManager(SQLConnectionManager):
 
         con_str.append(bool_to_connection_string_arg("encrypt", credentials.encrypt))
         con_str.append(
-            bool_to_connection_string_arg("TrustServerCertificate", credentials.trust_cert)
+            bool_to_connection_string_arg(
+                "TrustServerCertificate", credentials.trust_cert
+            )
         )
 
         plugin_version = __version__.version
@@ -407,15 +419,9 @@ class FabricConnectionManager(SQLConnectionManager):
 
         con_str_concat = ";".join(con_str)
 
-        index = []
-        for i, elem in enumerate(con_str):
-            if "pwd=" in elem.lower():
-                index.append(i)
-
-        if len(index) != 0:
-            con_str[index[0]] = "PWD=***"
-
-        con_str_display = ";".join(con_str)
+        con_str_display = con_str_concat
+        logger.debug(f"Using connection string: {con_str_display}")
+        print(f"Using connection string: {con_str_display}")
 
         retryable_exceptions = [  # https://github.com/mkleehammer/pyodbc/wiki/Exceptions
             pyodbc.InternalError,  # not used according to docs, but defined in PEP-249
@@ -430,7 +436,9 @@ class FabricConnectionManager(SQLConnectionManager):
             logger.debug(f"Using connection string: {con_str_display}")
             pyodbc.pooling = True
             if credentials.authentication == "ActiveDirectoryAccessToken":
-                attrs_before = get_pyodbc_attrs_before_accesstoken(credentials.access_token)
+                attrs_before = get_pyodbc_attrs_before_accesstoken(
+                    credentials.access_token
+                )
             else:
                 attrs_before = get_pyodbc_attrs_before_credentials(credentials)
 
@@ -491,7 +499,9 @@ class FabricConnectionManager(SQLConnectionManager):
 
             fire_event(
                 SQLQuery(
-                    conn_name=cast_to_str(connection.name), sql=log_sql, node_info=get_node_info()
+                    conn_name=cast_to_str(connection.name),
+                    sql=log_sql,
+                    node_info=get_node_info(),
                 )
             )
 
@@ -504,7 +514,11 @@ class FabricConnectionManager(SQLConnectionManager):
                 cursor.execute(sql)
             else:
                 bindings = [
-                    binding if not isinstance(binding, dt.datetime) else binding.isoformat()
+                    (
+                        binding
+                        if not isinstance(binding, dt.datetime)
+                        else binding.isoformat()
+                    )
                     for binding in bindings
                 ]
                 cursor.execute(sql, bindings)
@@ -547,11 +561,17 @@ class FabricConnectionManager(SQLConnectionManager):
 
     @classmethod
     def data_type_code_to_name(cls, type_code: Union[str, str]) -> str:
-        data_type = str(type_code)[str(type_code).index("'") + 1 : str(type_code).rindex("'")]
+        data_type = str(type_code)[
+            str(type_code).index("'") + 1 : str(type_code).rindex("'")
+        ]
         return datatypes[data_type]
 
     def execute(
-        self, sql: str, auto_begin: bool = True, fetch: bool = False, limit: Optional[int] = None
+        self,
+        sql: str,
+        auto_begin: bool = True,
+        fetch: bool = False,
+        limit: Optional[int] = None,
     ) -> Tuple[AdapterResponse, agate.Table]:
         sql = self._add_query_comment(sql)
         _, cursor = self.add_query(sql, auto_begin)
@@ -568,4 +588,3 @@ class FabricConnectionManager(SQLConnectionManager):
         while cursor.nextset():
             pass
         return response, table
-      
